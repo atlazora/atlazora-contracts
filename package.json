@@ -1,0 +1,17 @@
+{
+  "name": "@atlazora/contracts",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Shared executable contracts for Atlazora.",
+  "license": "UNLICENSED",
+  "scripts": {
+    "validate:openapi": "redocly lint openapi/**/*.yaml",
+    "validate:schemas": "node scripts/validate-schemas.mjs",
+    "validate": "npm run validate:openapi && npm run validate:schemas"
+  },
+  "devDependencies": {
+    "@redocly/cli": "2.50.0",
+    "ajv": "8.20.0",
+    "ajv-formats": "3.0.1"
+  }
+}
