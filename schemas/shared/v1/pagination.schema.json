@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Cursor Pagination",
+  "description": "Shared cursor-pagination contract primitives. Endpoint contracts define their own default and maximum limits.",
+  "type": "object",
+  "$defs": {
+    "cursor": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Opaque pagination cursor. Clients must not interpret its contents."
+    },
+    "limit": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Requested page size. Endpoint contracts define applicable default and maximum values."
+    },
+    "metadata": {
+      "type": "object",
+      "required": [
+        "has_more"
+      ],
+      "properties": {
+        "next_cursor": {
+          "$ref": "#/$defs/cursor"
+        },
+        "has_more": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": true
+    }
+  }
+}

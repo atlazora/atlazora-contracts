@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Problem Details",
+  "description": "RFC 9457 Problem Details representation with an Atlazora machine-readable error code.",
+  "type": "object",
+  "required": [
+    "code"
+  ],
+  "properties": {
+    "type": {
+      "type": "string",
+      "format": "uri-reference",
+      "description": "URI reference identifying the problem type."
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Short human-readable summary of the problem type."
+    },
+    "status": {
+      "type": "integer",
+      "minimum": 100,
+      "maximum": 599,
+      "description": "HTTP status code associated with this occurrence."
+    },
+    "detail": {
+      "type": "string",
+      "description": "Human-readable explanation specific to this occurrence."
+    },
+    "instance": {
+      "type": "string",
+      "format": "uri-reference",
+      "description": "URI reference identifying this specific problem occurrence."
+    },
+    "code": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Stable Atlazora machine-readable error code."
+    }
+  },
+  "additionalProperties": true
+}
