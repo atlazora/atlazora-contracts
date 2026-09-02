@@ -8,7 +8,11 @@
     "validate:openapi": "redocly lint --config redocly.yaml openapi/**/*.yaml",
     "validate:schemas": "node scripts/validate-schemas.mjs",
     "validate": "npm run validate:openapi && npm run validate:schemas && npm run validate:events",
-    "validate:events": "node scripts/validate-events.mjs"
+    "validate:events": "node scripts/validate-events.mjs",
+    "compatibility:openapi": "node scripts/check-openapi-compatibility.mjs",
+    "compatibility:schemas": "node scripts/check-schema-compatibility.mjs",
+    "compatibility": "npm run compatibility:openapi && npm run compatibility:schemas",
+    "verify": "npm run validate && npm run compatibility"
   },
   "devDependencies": {
     "@redocly/cli": "2.50.0",

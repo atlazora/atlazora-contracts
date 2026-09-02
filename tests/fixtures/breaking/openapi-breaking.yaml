@@ -1,0 +1,25 @@
+openapi: 3.1.2
+info:
+  title: Compatibility Fixture
+  version: 1.0.1
+paths:
+  /fixture:
+    post:
+      operationId: createFixture
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - id
+                - label
+              properties:
+                id:
+                  type: string
+                label:
+                  type: string
+      responses:
+        "204":
+          description: Accepted
