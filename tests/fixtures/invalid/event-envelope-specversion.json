@@ -1,0 +1,10 @@
+{
+  "specversion": "0.3",
+  "id": "01890f47-6c52-7cc1-98a4-123456789abc",
+  "source": "/domains/example",
+  "type": "example.event",
+  "time": "2026-09-02T17:00:00Z",
+  "datacontenttype": "application/json",
+  "dataschema": "example-payload.schema.json",
+  "data": {}
+}
