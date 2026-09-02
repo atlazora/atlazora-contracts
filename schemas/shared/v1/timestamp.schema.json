@@ -1,0 +1,9 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.atlazora.com/schemas/shared/v1/timestamp.schema.json",
+  "title": "Atlazora Timestamp",
+  "description": "RFC 3339 date-time normalized to UTC using the Z designator.",
+  "type": "string",
+  "format": "date-time",
+  "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?Z$"
+}
