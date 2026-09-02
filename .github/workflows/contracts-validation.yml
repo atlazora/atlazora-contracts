@@ -1,0 +1,44 @@
+name: Contracts Validation
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  contracts-validation:
+    name: contracts-validation
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: "24.16.0"
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version: "1.27.0"
+          cache: false
+
+      - name: Install contract dependencies
+        run: npm ci
+
+      - name: Verify executable contracts
+        run: npm run verify
+
+      - name: Audit contract dependencies
+        run: npm audit --audit-level=high
