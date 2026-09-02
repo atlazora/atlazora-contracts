@@ -1,0 +1,18 @@
+openapi: 3.1.2
+info:
+  title: Atlazora API
+  version: 1.0.0
+  description: Versioned synchronous API contract foundation for Atlazora.
+paths: {}
+components:
+  schemas:
+    Identifier:
+      $ref: ../../schemas/shared/v1/identifier.schema.json
+    Timestamp:
+      $ref: ../../schemas/shared/v1/timestamp.schema.json
+    Money:
+      $ref: ../../schemas/shared/v1/money.schema.json
+    ProblemDetails:
+      $ref: ../../schemas/shared/v1/problem-details.schema.json
+    Pagination:
+      $ref: ../../schemas/shared/v1/pagination.schema.json

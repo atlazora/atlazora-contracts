@@ -5,9 +5,9 @@
   "description": "Shared executable contracts for Atlazora.",
   "license": "UNLICENSED",
   "scripts": {
-    "validate:openapi": "redocly lint openapi/**/*.yaml",
+    "validate:openapi": "redocly lint --config redocly.yaml openapi/**/*.yaml",
     "validate:schemas": "node scripts/validate-schemas.mjs",
-    "validate": "npm run validate:openapi && npm run validate:schemas",
+    "validate": "npm run validate:openapi && npm run validate:schemas && npm run validate:events",
     "validate:events": "node scripts/validate-events.mjs"
   },
   "devDependencies": {
