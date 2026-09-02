@@ -1,148 +1,200 @@
 import fs from "node:fs";
+import path from "node:path";
 
-function readJson(path) {
-  return JSON.parse(fs.readFileSync(path, "utf8"));
+const root = process.cwd();
+
+function load(relativePath) {
+  return JSON.parse(fs.readFileSync(path.join(root, relativePath), "utf8"));
 }
 
-function normalizeType(value) {
+function hasOwn(value, key) {
+  return Object.prototype.hasOwnProperty.call(value, key);
+}
+
+function jsonEqual(left, right) {
+  return JSON.stringify(left) === JSON.stringify(right);
+}
+
+function typeSet(value) {
   if (value === undefined) return null;
-  return Array.isArray(value) ? [...value].sort() : [value];
+  return new Set(Array.isArray(value) ? value : [value]);
 }
 
-function sameArray(a, b) {
-  if (a === null && b === null) return true;
-  if (a === null || b === null) return false;
-  return a.length === b.length && a.every((value, index) => value === b[index]);
-}
+function compareSchema(base, revision, location = "$") {
+  const problems = [];
 
-function checkNode(base, revision, path, issues) {
-  const baseType = normalizeType(base.type);
-  const revisionType = normalizeType(revision.type);
+  const baseTypes = typeSet(base.type);
+  const revisionTypes = typeSet(revision.type);
 
-  if (!sameArray(baseType, revisionType)) {
-    issues.push(`${path}: incompatible type change`);
-  }
-
-  if (Array.isArray(base.enum)) {
-    if (!Array.isArray(revision.enum)) {
-      issues.push(`${path}: enum removed or changed incompatibly`);
-    } else {
-      const revisionValues = new Set(revision.enum.map(value => JSON.stringify(value)));
-      for (const value of base.enum) {
-        if (!revisionValues.has(JSON.stringify(value))) {
-          issues.push(`${path}: enum narrowing removed ${JSON.stringify(value)}`);
-        }
+  if (baseTypes === null && revisionTypes !== null) {
+    problems.push(`${location}: type constraint added`);
+  } else if (baseTypes !== null && revisionTypes !== null) {
+    for (const oldType of baseTypes) {
+      if (!revisionTypes.has(oldType)) {
+        problems.push(`${location}: previously allowed type removed: ${oldType}`);
       }
     }
   }
 
+  if (!hasOwn(base, "enum") && hasOwn(revision, "enum")) {
+    problems.push(`${location}: enum constraint added`);
+  } else if (hasOwn(base, "enum") && hasOwn(revision, "enum")) {
+    for (const oldValue of base.enum) {
+      if (!revision.enum.some((value) => jsonEqual(value, oldValue))) {
+        problems.push(`${location}: previously allowed enum value removed: ${JSON.stringify(oldValue)}`);
+      }
+    }
+  }
+
+  if (hasOwn(revision, "const")) {
+    if (!hasOwn(base, "const")) {
+      problems.push(`${location}: const constraint added`);
+    } else if (!jsonEqual(base.const, revision.const)) {
+      problems.push(`${location}: const constraint changed`);
+    }
+  }
+
   const lowerBounds = ["minimum", "exclusiveMinimum", "minLength", "minItems", "minProperties"];
-  for (const key of lowerBounds) {
-    if (base[key] !== undefined && revision[key] !== undefined && revision[key] > base[key]) {
-      issues.push(`${path}: ${key} tightened`);
+
+  for (const keyword of lowerBounds) {
+    if (hasOwn(revision, keyword)) {
+      if (!hasOwn(base, keyword)) {
+        problems.push(`${location}: ${keyword} constraint added`);
+      } else if (revision[keyword] > base[keyword]) {
+        problems.push(`${location}: ${keyword} tightened from ${base[keyword]} to ${revision[keyword]}`);
+      }
     }
   }
 
   const upperBounds = ["maximum", "exclusiveMaximum", "maxLength", "maxItems", "maxProperties"];
-  for (const key of upperBounds) {
-    if (base[key] !== undefined && revision[key] !== undefined && revision[key] < base[key]) {
-      issues.push(`${path}: ${key} tightened`);
+
+  for (const keyword of upperBounds) {
+    if (hasOwn(revision, keyword)) {
+      if (!hasOwn(base, keyword)) {
+        problems.push(`${location}: ${keyword} constraint added`);
+      } else if (revision[keyword] < base[keyword]) {
+        problems.push(`${location}: ${keyword} tightened from ${base[keyword]} to ${revision[keyword]}`);
+      }
     }
   }
 
-  if (base.pattern !== undefined && revision.pattern !== base.pattern) {
-    issues.push(`${path}: pattern changed conservatively`);
-  }
-
-  if (base.format !== undefined && revision.format !== base.format) {
-    issues.push(`${path}: format changed conservatively`);
-  }
-
-  if (base.additionalProperties !== false && revision.additionalProperties === false) {
-    issues.push(`${path}: additionalProperties tightened to false`);
+  for (const keyword of ["pattern", "format"]) {
+    if (hasOwn(revision, keyword)) {
+      if (!hasOwn(base, keyword)) {
+        problems.push(`${location}: ${keyword} constraint added`);
+      } else if (!jsonEqual(base[keyword], revision[keyword])) {
+        problems.push(`${location}: ${keyword} constraint changed`);
+      }
+    }
   }
 
   const baseRequired = new Set(base.required ?? []);
   const revisionRequired = new Set(revision.required ?? []);
 
-  for (const name of revisionRequired) {
-    if (!baseRequired.has(name)) {
-      issues.push(`${path}: new required property ${name}`);
+  for (const property of revisionRequired) {
+    if (!baseRequired.has(property)) {
+      problems.push(`${location}: new required property: ${property}`);
     }
   }
 
   const baseProperties = base.properties ?? {};
   const revisionProperties = revision.properties ?? {};
 
-  for (const [name, child] of Object.entries(baseProperties)) {
-    if (!(name in revisionProperties)) {
-      issues.push(`${path}: established property removed ${name}`);
+  for (const property of Object.keys(baseProperties)) {
+    if (!hasOwn(revisionProperties, property)) {
+      problems.push(`${location}: property removed: ${property}`);
       continue;
     }
 
-    checkNode(
-      child,
-      revisionProperties[name],
-      `${path}.properties.${name}`,
-      issues
+    problems.push(
+      ...compareSchema(
+        baseProperties[property],
+        revisionProperties[property],
+        `${location}.properties.${property}`
+      )
     );
+  }
+
+  const baseAdditional = base.additionalProperties;
+  const revisionAdditional = revision.additionalProperties;
+
+  if (baseAdditional !== false && revisionAdditional === false) {
+    problems.push(`${location}: additionalProperties changed from allowed to forbidden`);
+  } else if (
+    baseAdditional &&
+    typeof baseAdditional === "object" &&
+    revisionAdditional &&
+    typeof revisionAdditional === "object"
+  ) {
+    problems.push(
+      ...compareSchema(
+        baseAdditional,
+        revisionAdditional,
+        `${location}.additionalProperties`
+      )
+    );
+  } else if (
+    (baseAdditional === true || baseAdditional === undefined) &&
+    revisionAdditional &&
+    typeof revisionAdditional === "object"
+  ) {
+    problems.push(`${location}: additionalProperties schema constraint added`);
   }
 
   const baseDefs = base.$defs ?? {};
   const revisionDefs = revision.$defs ?? {};
 
-  for (const [name, child] of Object.entries(baseDefs)) {
-    if (!(name in revisionDefs)) {
-      issues.push(`${path}: established $defs entry removed ${name}`);
+  for (const definition of Object.keys(baseDefs)) {
+    if (!hasOwn(revisionDefs, definition)) {
+      problems.push(`${location}: $defs entry removed: ${definition}`);
       continue;
     }
 
-    checkNode(
-      child,
-      revisionDefs[name],
-      `${path}.$defs.${name}`,
-      issues
+    problems.push(
+      ...compareSchema(
+        baseDefs[definition],
+        revisionDefs[definition],
+        `${location}.$defs.${definition}`
+      )
     );
+  }
+
+  return problems;
+}
+
+function assertCompatible(basePath, revisionPath) {
+  const problems = compareSchema(load(basePath), load(revisionPath));
+
+  if (problems.length > 0) {
+    throw new Error(`Expected compatible schema, found breaking changes:\n${problems.join("\n")}`);
   }
 }
 
-function compare(basePath, revisionPath) {
-  const issues = [];
-  checkNode(readJson(basePath), readJson(revisionPath), "$", issues);
-  return issues;
+function assertBreaking(label, basePath, revisionPath) {
+  const problems = compareSchema(load(basePath), load(revisionPath));
+
+  if (problems.length === 0) {
+    throw new Error(`Expected breaking schema fixture was accepted: ${revisionPath}`);
+  }
+
+  console.log(`SCHEMA_BREAKING_${label}=REJECTED`);
 }
 
 const base = "tests/fixtures/compatible/schema-base.json";
 
-const compatible = compare(
-  base,
-  "tests/fixtures/compatible/schema-compatible.json"
-);
-
-if (compatible.length !== 0) {
-  console.error("Compatible schema fixture was rejected:");
-  for (const issue of compatible) console.error(issue);
-  process.exit(1);
-}
-
+assertCompatible(base, "tests/fixtures/compatible/schema-compatible.json");
 console.log("SCHEMA_COMPATIBLE_FIXTURE=PASS");
 
 const breakingCases = [
   ["TYPE_CHANGE", "tests/fixtures/breaking/schema-type-change.json"],
   ["NEW_REQUIRED", "tests/fixtures/breaking/schema-new-required.json"],
   ["ENUM_NARROWING", "tests/fixtures/breaking/schema-enum-narrowing.json"],
-  ["CONSTRAINT_TIGHTENING", "tests/fixtures/breaking/schema-constraint-tightening.json"]
+  ["CONSTRAINT_TIGHTENING", "tests/fixtures/breaking/schema-constraint-tightening.json"],
+  ["PROPERTY_REMOVAL", "tests/fixtures/breaking/schema-property-removal.json"]
 ];
 
-for (const [name, path] of breakingCases) {
-  const issues = compare(base, path);
-
-  if (issues.length === 0) {
-    console.error(`Breaking schema fixture was not detected: ${name}`);
-    process.exit(1);
-  }
-
-  console.log(`SCHEMA_BREAKING_${name}=REJECTED`);
+for (const [label, revision] of breakingCases) {
+  assertBreaking(label, base, revision);
 }
 
 console.log("SCHEMA_COMPATIBILITY_CHECK=PASS");
